@@ -1,64 +1,88 @@
 #include "Tracker.h"
 #include <iostream>
-#include <limits>
+#include <fstream>
+#include <sstream>
+#include <iomanip>
 
-void displayMenu() {
-    std::cout << "\n--- Smart Expense Tracker ---\n";
-    std::cout << "1. Add Expense\n";
-    std::cout << "2. View All Expenses\n";
-    std::cout << "3. View Expenses by Category\n";
-    std::cout << "4. Show Total Statistics\n";
-    std::cout << "5. Exit\n";
-    std::cout << "Enter choice: ";
+Tracker::Tracker() {
+    loadFromFile();
 }
 
-int main() {
-    Tracker myTracker;
-    int choice;
+void Tracker::loadFromFile() {
+    std::ifstream file(filename);
+    if (!file.is_open()) return;
 
-    while (true) {
-        displayMenu();
-        if (!(std::cin >> choice)) {
-            std::cout << "Invalid input. Please enter a number.\n";
-            std::cin.clear();
-            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-            continue;
-        }
+    std::string line;
+    while (std::getline(file, line)) {
+        std::stringstream ss(line);
+        Expense e;
+        std::string amountStr;
 
-        if (choice == 5) break;
-
-        if (choice == 1) {
-            Expense e;
-            std::cout << "Enter date (YYYY-MM-DD): ";
-            std::cin >> e.date;
-            std::cout << "Enter category (e.g., Food, Rent, Transport): ";
-            std::cin >> e.category;
-            std::cin.ignore();
-            std::cout << "Enter description: ";
-            std::getline(std::cin, e.description);
-            std::cout << "Enter amount: ";
-            while (!(std::cin >> e.amount) || e.amount < 0) {
-                std::cout << "Invalid amount. Enter a valid positive number: ";
-                std::cin.clear();
-                std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-            }
-            myTracker.addExpense(e);
-        } 
-        else if (choice == 2) {
-            myTracker.viewAll();
-        } 
-        else if (choice == 3) {
-            std::string category;
-            std::cout << "Enter category to filter: ";
-            std::cin >> category;
-            myTracker.viewByCategory(category);
-        } 
-        else if (choice == 4) {
-            myTracker.showTotalSpent();
-        } 
-        else {
-            std::cout << "Invalid choice. Try again.\n";
+        if (std::getline(ss, e.date, ',') &&
+            std::getline(ss, e.category, ',') &&
+            std::getline(ss, e.description, ',') &&
+            std::getline(ss, amountStr)) {
+            e.amount = std::stod(amountStr);
+            expenses.push_back(e);
         }
     }
-    return 0;
+    file.close();
 }
+
+void Tracker::saveToFile() const {
+    std::ofstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "Error saving to file!\n";
+        return;
+    }
+    for (const auto& e : expenses) {
+        file << e.date << "," << e.category << "," << e.description << "," << e.amount << "\n";
+    }
+}
+
+void Tracker::addExpense(const Expense& e) {
+    expenses.push_back(e);
+    saveToFile();
+    std::cout << "Expense added successfully!\n";
+}
+
+void Tracker::viewAll() const {
+    if (expenses.empty()) {
+        std::cout << "No expenses recorded yet.\n";
+        return;
+    }
+    std::cout << "\n---------------------------------------------------------\n";
+    std::cout << std::left << std::setw(12) << "Date" << std::setw(15) << "Category" 
+              << std::setw(20) << "Description" << "Amount\n";
+    std::cout << "---------------------------------------------------------\n";
+    for (const auto& e : expenses) {
+        std::cout << std::left << std::setw(12) << e.date << std::setw(15) << e.category 
+                  << std::setw(20) << e.description << "$" << std::fixed << std::setsetprecision(2) << e.amount << "\n";
+    }
+}
+
+void Tracker::viewByCategory(const std::string& category) const {
+    double total = 0;
+    bool found = false;
+    for (const auto& e : expenses) {
+        if (e.category == category) {
+            if (!found) {
+                std::cout << "\nExpenses for category: " << category << "\n";
+                found = true;
+            }
+            std::cout << e.date << " - " << e.description << ": $" << e.amount << "\n";
+            total += e.amount;
+        }
+    }
+    if (!found) std::cout << "No expenses found in this category.\n";
+    else std::cout << "Total category spent: $" << total << "\n";
+}
+
+void Tracker::showTotalSpent() const {
+    double total = 0;
+    for (const auto& e : expenses) {
+        total += e.amount;
+    }
+    std::cout << "\nTotal Cumulative Expenses: $" << total << "\n";
+}
+
